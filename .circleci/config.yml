@@ -189,6 +189,8 @@ jobs:
           command: |
             apk add --update ansible
             apk add tar gzip
+            apk add openssh
+            service sshd start
       - run:
           name: Configure server
           command: |

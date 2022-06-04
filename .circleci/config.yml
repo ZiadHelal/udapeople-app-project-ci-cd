@@ -20,30 +20,42 @@ jobs:
       - image: circleci/node:13.8.0
     steps:
       - checkout
+      - restore_cache:
+          keys: [frontend-build]
       - run:
           name: Build front-end
           command: |
             cd frontend
             npm install
             npm run build
+      - save_cache:
+          paths: [frontend/node_modules]
+          key: frontend-build
 
   build-backend:
     docker:
       - image: circleci/node:13.8.0
     steps:
       - checkout
+      - restore_cache:
+          keys: [backend-build]
       - run:
           name: Back-end build
           command: |
             cd backend
             npm install
             npm run build
+      - save_cache:
+          paths: [backend/node_modules]
+          key: backend-build
 
   test-frontend:
     docker:
       - image: circleci/node:13.8.0
     steps:
       - checkout
+      - restore_cache:
+          keys: [frontend-build]
       - run:
           name: Test front-end
           command: |
@@ -56,6 +68,8 @@ jobs:
       - image: circleci/node:13.8.0
     steps:
       - checkout
+      - restore_cache:
+          keys: [backend-build]
       - run:
           name: Test back-end
           command: |
@@ -68,6 +82,8 @@ jobs:
       - image: circleci/node:13.8.0
     steps:
       - checkout
+      - restore_cache:
+          keys: [frontend-build]
       - run:
           name: Scan frontend dependencies
           command: |
@@ -81,6 +97,8 @@ jobs:
       - image: circleci/node:13.8.0
     steps:
       - checkout
+      - restore_cache:
+          keys: [backend-build]
       - run:
           name: Scan backend dependencies
           command: |
@@ -106,7 +124,7 @@ jobs:
             --template-file .circleci/files/backend.yml \
             --tags project=udapeople \
             --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-            --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  
+            --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"
       - run:
           name: Ensure front-end infrastructure exist
           command: |
@@ -114,7 +132,7 @@ jobs:
             --template-file .circleci/files/frontend.yml \
             --tags project=udapeople \
             --stack-name "udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
-            --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  
+            --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"
       - run:
           name: Add back-end ip to ansible inventory
           command: |
@@ -126,6 +144,27 @@ jobs:
           root: ~/
           paths:
             - project/.circleci/ansible/inventory.txt
+      - destroy-environment:
+          workflow-ID: ${CIRCLE_WORKFLOW_ID:0:7}
+
+  configure-infrastructure:
+    docker:
+      - image: python:3.7-alpine3.11
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints: ["a8:19:fb:ef:31:83:04:81:9e:c8:c2:40:80:1f:99:15"]
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Install dependencies
+          command: |
+            apk add --update ansible
+            apk add tar gzip
+      - run:
+          name: Configure server
+          command: |
+            ansible-playbook -i inventory.txt
       - destroy-environment:
           workflow-ID: ${CIRCLE_WORKFLOW_ID:0:7}
 

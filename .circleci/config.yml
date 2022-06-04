@@ -167,7 +167,7 @@ jobs:
 
   configure-infrastructure:
     docker:
-      - image: python:3.7-alpine3.11
+      - image: cimg/base:stable
     steps:
       - checkout
       - add_ssh_keys:
@@ -177,20 +177,16 @@ jobs:
       - run:
           name: install AWS CLI
           command: |
-            apk update
-            apk upgrade
-            apk add --update unzip
-            apk add --update curl
             curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
             unzip awscliv2.zip
-            ./aws/install
+            sudo ./aws/install
       - run:
           name: Install dependencies
           command: |
-            apk add --update ansible
-            apk add tar gzip
-            apk add openssh
-            service sshd start
+            sudo apt update
+            sudo apt install software-properties-common
+            sudo add-apt-repository --yes --update ppa:ansible/ansible
+            sudo apt install ansible
       - run:
           name: Configure server
           command: |

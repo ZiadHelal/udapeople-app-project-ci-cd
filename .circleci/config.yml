@@ -163,9 +163,10 @@ jobs:
             npm audit --audit-level=critical
 
   deploy-infrastructure:
-    executor: aws-cli-img
+    executor: ubuntu-stable-img
     steps:
       - checkout
+      - aws-cli
       # - run:
       #     name: Installing tar and gzip
       #     command: |
@@ -293,7 +294,7 @@ jobs:
             cat inventory.txt
             ansible-playbook -i inventory.txt deploy-backend.yml
       - destroy-environment:
-          workflow-ID: ${CIRCLE_WORKFLOW_ID:0:7}  
+          workflow-ID: ${CIRCLE_WORKFLOW_ID:0:7}
       - revert-migrations:
           workflow-ID: ${CIRCLE_WORKFLOW_ID:0:7}
 

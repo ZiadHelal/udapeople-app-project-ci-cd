@@ -8,10 +8,6 @@ executors:
     docker:
       - image: cimg/node:13.8.0
 
-  aws-cli-img:
-    docker:
-      - image: amazon/aws-cli
-
 commands:
   destroy-environment:
     description: Destroy back-end and front-end cloudformation stacks given a workflow ID.
@@ -286,6 +282,7 @@ jobs:
             npm run build
             cd ..
             tar -C backend -czvf artifact.tar.gz .
+            cp artifact.tar.gz .circleci/ansible/roles/deploy/files
             cd .circleci/ansible
             echo "Contents  of the inventory.txt file is -------"
             cat inventory.txt

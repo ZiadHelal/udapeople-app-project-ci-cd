@@ -1,4 +1,16 @@
 version: 2.1
+executors:
+  ubuntu-stable-img:
+    docker:
+      - image: cimg/base:stable
+
+  node-v13-img:
+    docker:
+      - image: cimg/node:13.8.0
+
+  aws-cli-img:
+    docker:
+      - image: amazon/aws-cli
 
 commands:
   destroy-environment:
@@ -32,10 +44,39 @@ commands:
               npm run migration:revert
             fi
 
+  aws-cli:
+    description: Installs AWS CLI on ubuntu image.
+    steps:
+      - run:
+          name: Installing AWS CLI
+          command: |
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
+
+  ansible:
+    description: Installs Ansible on ubuntu image.
+    steps:
+      - run:
+          name: Installing Ansible
+          command: |
+            sudo apt update
+            sudo apt install -y software-properties-common
+            sudo add-apt-repository --yes --update ppa:ansible/ansible
+            sudo apt install -y ansible
+
+  node-v13:
+    description: Installs node 13.8.x on ubuntu image.
+    steps:
+      - run:
+          name: Installing Node
+          command: |
+            curl -fsSL https://deb.nodesource.com/setup_13.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+
 jobs:
   build-frontend:
-    docker:
-      - image: circleci/node:13.8.0
+    executor: node-v13-img
     steps:
       - checkout
       - restore_cache:
@@ -51,8 +92,7 @@ jobs:
           key: frontend-build
 
   build-backend:
-    docker:
-      - image: circleci/node:13.8.0
+    executor: node-v13-img
     steps:
       - checkout
       - restore_cache:
@@ -68,8 +108,7 @@ jobs:
           key: backend-build
 
   test-frontend:
-    docker:
-      - image: circleci/node:13.8.0
+    executor: node-v13-img
     steps:
       - checkout
       - restore_cache:
@@ -82,8 +121,7 @@ jobs:
             npm run test
 
   test-backend:
-    docker:
-      - image: circleci/node:13.8.0
+    executor: node-v13-img
     steps:
       - checkout
       - restore_cache:
@@ -96,8 +134,7 @@ jobs:
             npm run test
 
   scan-frontend:
-    docker:
-      - image: circleci/node:13.8.0
+    executor: node-v13-img
     steps:
       - checkout
       - restore_cache:
@@ -111,8 +148,7 @@ jobs:
             npm audit --audit-level=critical
 
   scan-backend:
-    docker:
-      - image: circleci/node:13.8.0
+    executor: node-v13-img
     steps:
       - checkout
       - restore_cache:
@@ -127,14 +163,13 @@ jobs:
             npm audit --audit-level=critical
 
   deploy-infrastructure:
-    docker:
-      - image: amazon/aws-cli
+    executor: aws-cli-img
     steps:
       - checkout
-      - run:
-          name: Installing tar and gzip
-          command: |
-            yum -y install tar gzip
+      # - run:
+      #     name: Installing tar and gzip
+      #     command: |
+      #       yum -y install tar gzip
       - run:
           name: Ensure back-end infrastructure exists
           command: |
@@ -166,27 +201,15 @@ jobs:
           workflow-ID: ${CIRCLE_WORKFLOW_ID:0:7}
 
   configure-infrastructure:
-    docker:
-      - image: cimg/base:stable
+    executor: ubuntu-stable-img
     steps:
       - checkout
+      - aws-cli
+      - ansible
       - add_ssh_keys:
           fingerprints: ["a8:19:fb:ef:31:83:04:81:9e:c8:c2:40:80:1f:99:15"]
       - attach_workspace:
           at: ~/
-      - run:
-          name: install AWS CLI
-          command: |
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            unzip awscliv2.zip
-            sudo ./aws/install
-      - run:
-          name: Install dependencies
-          command: |
-            sudo apt update
-            sudo apt install software-properties-common
-            sudo add-apt-repository --yes --update ppa:ansible/ansible
-            sudo apt install ansible
       - run:
           name: Configure server
           command: |
@@ -196,16 +219,10 @@ jobs:
           workflow-ID: ${CIRCLE_WORKFLOW_ID:0:7}
 
   run-migrations:
-    docker:
-      - image: cimg/node:13.8.0
+    executor: node-v13-img
     steps:
       - checkout
-      - run:
-          name: install AWS CLI
-          command: |
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            unzip awscliv2.zip
-            sudo ./aws/install
+      - aws-cli
       - run:
           name: Run migrations
           command: |
@@ -221,8 +238,65 @@ jobs:
             fi
       - destroy-environment:
           workflow-ID: ${CIRCLE_WORKFLOW_ID:0:7}
+
+  deploy-frontend:
+    executor: ubuntu-stable-img
+    steps:
+      - checkout
+      - aws-cli
+      - node-v13
+      - run:
+          name: Get backend url
+          command: |
+            export BACKEND_IP=$(aws ec2 describe-instances \
+            --query 'Reservations[*].Instances[*].PublicIpAddress' \
+            --filters "Name=tag:project,Values=udapeople" \
+            --output text
+            export API_URL="http://${BACKEND_IP}:3030"
+            echo "${API_URL}"
+            echo API_URL="http://${BACKEND_IP}:3030" >> frontend/.env
+            cat frontend/.env
+      - run:
+          name: Deploy frontend objects
+          command: |
+            cd frontend
+            npm install
+            npm run build
+            tar -czvf artifact-"${CIRCLE_WORKFLOW_ID:0:7}".tar.gz dist
+            aws s3 cp dist s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7} --recursive
+      - destroy-environment:
+          workflow-ID: ${CIRCLE_WORKFLOW_ID:0:7}
       - revert-migrations:
           workflow-ID: ${CIRCLE_WORKFLOW_ID:0:7}
+
+  deploy-backend:
+    executor: ubuntu-stable-img
+    steps:
+      - checkout
+      - aws-cli
+      - node-v13
+      - ansible
+      - add_ssh_keys:
+          fingerprints: ["a8:19:fb:ef:31:83:04:81:9e:c8:c2:40:80:1f:99:15"]
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Deploy backend
+          command: |
+            cd backend
+            npm i
+            npm run build
+            cd ..
+            tar -C backend -czvf artifact.tar.gz .
+            cd .circleci/ansible
+            echo "Contents  of the inventory.txt file is -------"
+            cat inventory.txt
+            ansible-playbook -i inventory.txt deploy-backend.yml
+      - destroy-environment:
+          workflow-ID: ${CIRCLE_WORKFLOW_ID:0:7}  
+      - revert-migrations:
+          workflow-ID: ${CIRCLE_WORKFLOW_ID:0:7}
+
 
 workflows:
   default:
@@ -253,3 +327,6 @@ workflows:
       - run-migrations:
           requires:
             - configure-infrastructure
+      - deploy-frontend:
+          requires:
+            - run-migrations

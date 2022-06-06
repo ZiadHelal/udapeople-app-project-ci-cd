@@ -414,6 +414,10 @@ workflows:
             - scan-frontend
             - test-backend
             - scan-backend
+          filters:
+            branches:
+              only:
+                - master
       - configure-infrastructure:
           requires:
             - deploy-infrastructure

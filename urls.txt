@@ -1,0 +1,5 @@
+1. Public Url to GitHub repository (not private):
+	https://github.com/ZiadHelal/udapeople-app-project-ci-cd
+
+2. Public URL for S3 Bucket (aka, green candidate front-end):
+	http://udapeople-c9ff946.s3-website-us-east-1.amazonaws.com

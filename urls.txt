@@ -2,4 +2,4 @@
 	https://github.com/ZiadHelal/udapeople-app-project-ci-cd
 
 2. Public URL for S3 Bucket (aka, green candidate front-end):
-	http://udapeople-a18724c.s3-website-us-east-1.amazonaws.com
+	http://udapeople-a28e6dd.s3-website-us-east-1.amazonaws.com
